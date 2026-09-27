@@ -11,6 +11,18 @@ function run(command, args, options = {}) {
   });
 }
 
+// Защита от случайной утечки административного ключа в публичной карточке.
+// Пока пилот маленький, делаем это на этапе сборки, чтобы ссылка после создания
+// запроса всегда была чистой: /r/<id> без служебного параметра.
+const workerPath = "src/index.js";
+const workerSource = readFileSync(workerPath, "utf8");
+const unsafeRedirect = 'return redirect(`/r/${rid}?admin=${encodeURIComponent(admin.token)}`);';
+const safeRedirect = 'return redirect(`/r/${rid}`);';
+if (workerSource.includes(unsafeRedirect)) {
+  writeFileSync(workerPath, workerSource.replace(unsafeRedirect, safeRedirect), "utf8");
+  console.log("Удалил административный ключ из публичного редиректа карточки.");
+}
+
 console.log(`Ищу существующую D1 базу ${DB_NAME}...`);
 const raw = run("npx", ["wrangler", "d1", "list", "--json"], { capture: true });
 const databases = JSON.parse(raw);
