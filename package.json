@@ -1,9 +1,9 @@
 {
   "name": "global-connect-pilot",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "scripts": {
-    "deploy": "wrangler deploy"
+    "deploy": "node scripts/deploy.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.141.0"
