@@ -1,7 +1,7 @@
 [project]
 name = "global-connect-pilot"
 version = "0.8.0"
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.14"
 dependencies = [
   "fastapi>=0.117"
 ]
