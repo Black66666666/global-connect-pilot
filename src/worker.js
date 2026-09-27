@@ -1,5 +1,29 @@
 import app from "./index.js";
 
+const ENGLISH_CARDS = {
+  acf0adc6f9: {
+    title: "Find an engineer with firsthand experience of a large PostgreSQL major-version upgrade",
+    deadline: "14 days",
+    budget: "Not defined",
+    constraints: "We need firsthand practical experience, not general PostgreSQL consulting and not a sales proposal. A close version path is acceptable if the production database was at least 5 TB and the system remained in active use.",
+    success: "A specific engineer or architect with verified firsthand experience agrees to a 20-minute research conversation.",
+  },
+  bb46e4fca9: {
+    title: "Find a technical leader with firsthand experience of a staged Angular → React migration",
+    deadline: "14 days",
+    budget: "Not defined",
+    constraints: "We need Angular 2+ → React experience, not AngularJS → Angular. The migration should have been staged while the existing production product remained live, preferably in a large enterprise system.",
+    success: "A technical lead or architect with this firsthand experience agrees to a 20-minute research conversation.",
+  },
+  "8afa4eea76": {
+    title: "Find an operator of a production AI system that escalates to a human and then continues the workflow",
+    deadline: "14 days",
+    budget: "Not defined",
+    constraints: "We need a real production system, not a demo. Preferably someone from the customer/operator side rather than only a platform vendor. No confidential metrics need to be disclosed.",
+    success: "A person who directly works with such a production system agrees to a 20-minute research conversation.",
+  },
+};
+
 function patchedDatabase(db) {
   return new Proxy(db, {
     get(target, prop) {
@@ -50,8 +74,94 @@ function stripAdminTokenFromRedirect(request, response) {
   return new Response(null, { status: 303, headers });
 }
 
+function esc(value = "") {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function englishPage(title, body) {
+  const css = `
+    :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#18181b;background:#f7f7f8}
+    *{box-sizing:border-box}body{margin:0}.wrap{max-width:820px;margin:0 auto;padding:28px 18px 60px}.card{background:#fff;border:1px solid #e4e4e7;border-radius:20px;padding:24px;box-shadow:0 6px 24px rgba(0,0,0,.05);margin:16px 0}h1{font-size:30px;margin:0 0 10px}h2{font-size:20px}.muted{color:#71717a}.pill{display:inline-block;padding:6px 10px;border-radius:999px;background:#f4f4f5;margin:3px 4px 3px 0;font-size:13px}.field{margin:14px 0}label{display:block;font-size:14px;font-weight:650;margin-bottom:6px}input,textarea{width:100%;padding:11px 12px;border:1px solid #d4d4d8;border-radius:10px;font:inherit}textarea{min-height:96px;resize:vertical}button{border:0;border-radius:10px;background:#18181b;color:#fff;padding:11px 14px;font-weight:650;cursor:pointer}.action{border-top:1px solid #eee;padding-top:16px;margin-top:16px}.ok{background:#ecfdf5;border-color:#a7f3d0}@media(max-width:620px){h1{font-size:25px}}
+  `;
+  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${esc(title)}</title><style>${css}</style></head><body><main class="wrap">${body}</main></body></html>`, {
+    headers: { "content-type": "text/html; charset=utf-8" },
+  });
+}
+
+async function markEnglishView(env, rid, ref) {
+  if (!ref) return;
+  const now = new Date().toISOString();
+  await env.DB.prepare(`
+    INSERT INTO invitations(request_id,source_ref,first_viewed_at)
+    VALUES(?,?,?)
+    ON CONFLICT(request_id,source_ref) DO UPDATE SET
+      first_viewed_at=COALESCE(invitations.first_viewed_at,excluded.first_viewed_at)
+  `).bind(rid, ref.slice(0,64), now).run();
+}
+
+async function renderEnglishCard(request, env, rid) {
+  const card = ENGLISH_CARDS[rid];
+  if (!card) return null;
+
+  const row = await env.DB.prepare("SELECT id,status,attention_budget FROM requests WHERE id=? LIMIT 1").bind(rid).first();
+  if (!row) return null;
+
+  const url = new URL(request.url);
+  const ref = (url.searchParams.get("ref") || "").slice(0,64);
+  await markEnglishView(env, rid, ref);
+
+  const events = await env.DB.prepare("SELECT action FROM events WHERE request_id=?").bind(rid).all();
+  const used = (events.results || []).filter((e) => e.action === "direction" || e.action === "person").length;
+  const left = Math.max(0, Number(row.attention_budget || 0) - used);
+  const refQuery = ref ? `&ref=${encodeURIComponent(ref)}` : "";
+  const thanks = url.searchParams.get("thanks") === "1"
+    ? `<div class="card ok"><b>Thank you. Your response has been saved.</b></div>`
+    : "";
+
+  const body = `${thanks}
+    <div class="card">
+      <span class="pill">Request ${esc(rid)}</span><span class="pill">Status: ${esc(row.status)}</span>
+      <h1>${esc(card.title)}</h1>
+      <div class="field"><div class="muted">Deadline</div><div>${esc(card.deadline)}</div></div>
+      <div class="field"><div class="muted">Budget</div><div>${esc(card.budget)}</div></div>
+      <div class="field"><div class="muted">Constraints</div><div>${esc(card.constraints)}</div></div>
+      <div class="field"><div class="muted">What counts as success</div><div>${esc(card.success)}</div></div>
+      <p class="muted">Remaining high-cost human interventions: ${left}. Even a short pointer about where to look can be useful.</p>
+    </div>
+    <div class="card">
+      <h2>How can you help?</h2>
+      <form method="post" action="/r/${esc(rid)}/event?x=1${refQuery}">
+        <div class="action"><label><input style="width:auto" type="radio" name="action" value="direction" checked> I know where to look</label><p class="muted">For example: “Ask the operations team rather than IT” or “Try this community.”</p></div>
+        <div class="action"><label><input style="width:auto" type="radio" name="action" value="person"> I know a specific person</label><p class="muted">A name or role is enough. Please do not share private contact details without permission.</p></div>
+        <div class="action"><label><input style="width:auto" type="radio" name="action" value="solve"> I can help directly</label></div>
+        <div class="action"><label><input style="width:auto" type="radio" name="action" value="clarify"> The request needs clarification</label></div>
+        <div class="action"><label><input style="width:auto" type="radio" name="action" value="pass"> I cannot help</label></div>
+        <div class="field"><label>Comment</label><textarea name="note" placeholder="A direction, a person/role, or a clarifying question"></textarea></div>
+        <div class="field"><label>Your contact details — optional</label><input name="contact" placeholder="Only your own contact details or a public/approved contact"></div>
+        <button type="submit">Send response</button>
+      </form>
+      <p class="muted">No registration is required. Your response is used only for this request.</p>
+    </div>`;
+
+  return englishPage(card.title, body);
+}
+
 export default {
   async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    if (request.method === "GET") {
+      const match = url.pathname.match(/^\/r\/([a-zA-Z0-9_-]+)$/);
+      if (match && ENGLISH_CARDS[match[1]]) {
+        const response = await renderEnglishCard(request, env, match[1]);
+        if (response) return response;
+      }
+    }
+
     const response = await app.fetch(request, patchedEnvironment(env), ctx);
     return stripAdminTokenFromRedirect(request, response);
   },
