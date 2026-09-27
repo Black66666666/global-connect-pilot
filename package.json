@@ -1,0 +1,11 @@
+{
+  "name": "global-connect-pilot",
+  "version": "0.8.1",
+  "private": true,
+  "scripts": {
+    "deploy": "python -m pip install -q uv && python -m uv run pywrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.64.0"
+  }
+}
