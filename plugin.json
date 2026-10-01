@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "global-connect",
-  "version": "0.2.0",
-  "description": "Route real human requests through shareable cards and measurable referral paths.",
+  "version": "0.3.1",
+  "description": "Turn a real human request into a shareable card and measure whether routing it through people and communities produces useful help.",
   "author": {
     "name": "Global Connect",
     "email": "globalconnect-pilot@agentmail.to",
@@ -16,16 +16,16 @@
       "onboardingSkill": "./skills/global-connect/SKILL.md",
       "interface": {
         "displayName": "Global Connect",
-        "shortDescription": "Route a real request through people and communities",
-        "longDescription": "Turn a real-world request into a portable card, register measurable distribution routes, and compare which people or communities actually open, respond, redirect, or solve it.",
+        "shortDescription": "Create and route a real request through people and communities",
+        "longDescription": "Create a portable public-link request card, preserve its real source and success criteria, and measure aggregate routing outcomes. Authorized operators can additionally register and inspect individual distribution routes without exposing private responder contacts.",
         "websiteURL": "https://global-connect-pilot.biv-ai-lab.workers.dev/plugin",
         "supportURL": "https://global-connect-pilot.biv-ai-lab.workers.dev/support",
         "privacyPolicyURL": "https://global-connect-pilot.biv-ai-lab.workers.dev/privacy",
         "termsOfServiceURL": "https://global-connect-pilot.biv-ai-lab.workers.dev/terms",
         "defaultPrompt": [
-          "Show my active Global Connect requests and their routing results.",
           "Draft a Global Connect card for this real-world request.",
-          "Compare the distribution routes for this request."
+          "Create a public Global Connect card from this request and return the link.",
+          "Check the aggregate routing results for this Global Connect request ID."
         ],
         "brandColor": "#18181B"
       }
