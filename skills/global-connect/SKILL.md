@@ -15,21 +15,17 @@ Global Connect routes a real request to people, communities, services, or agents
 
 1. If the user supplied a real request, preserve its meaning, constraints, location, timing, and definition of success.
 2. If the request is incomplete, use `draft_request` first. Ask only for information that materially changes routing.
-3. Before creating a duplicate, use `list_requests` when an existing request may already represent the same need.
-4. Create a card only when the user explicitly wants a new request and `create_request` is available.
-5. Return the public request URL after creation.
-6. Before an external distribution attempt, register a unique route with `register_route` when that tool is available. Use a non-sensitive target label and do not store private email addresses as route labels.
+3. Before creating a duplicate, use `list_requests` only when that authorized operator tool is available. Anonymous users cannot enumerate all requests.
+4. Create a card only when the user explicitly wants a new request or asks to publish it.
+5. Return the public request URL after creation and state that creating a card does not distribute it.
+6. Before an external distribution attempt, register a unique route with `register_route` when that authorized operator tool is available. Use a non-sensitive target label and never store private email addresses as route labels.
 7. Use the returned tracked URL for that route. Every external route must have its own `source_ref`.
-8. Before judging whether routing worked, call `get_request_stats` or `list_routes` and distinguish:
-   - routes sent;
-   - card opens;
-   - responses;
-   - "where to look" directions;
-   - named-person referrals;
-   - direct helpers.
-9. Prefer a few highly relevant routes over broad indiscriminate distribution.
-10. Never expose private responder contact fields. Use public profiles or consented contact details only.
-11. Do not claim a request is solved until its success criterion is actually met.
+8. Before judging whether routing worked, call `get_request_stats` and, when authorized, `list_routes`. Distinguish routes sent, opens, responses, directions, named-person referrals and direct helpers.
+9. When an authorized operator needs to act on a response, use `get_responses`. Contact fields are private and should be requested only when actually needed.
+10. Prefer a few highly relevant routes over broad indiscriminate distribution.
+11. Never expose private responder contact fields to an anonymous/public user. Use public profiles or consented contact details only.
+12. Do not claim a request is solved merely because somebody clicked “I can help”. Confirm the real-world success criterion first.
+13. When the real-world result becomes known and `record_outcome` is available, record `succeeded`, `failed`, `expired`, or keep `pending`, with a concise operator note. Public users may see only the outcome state, never the private note.
 
 ## Distribution policy
 
@@ -40,3 +36,5 @@ Register the route before sending or posting when possible. `register_route` onl
 ## Safety and privacy
 
 Do not create or distribute requests that expose unnecessary personal data. For third-party source requests, preserve a public source URL and state clearly when the requester has agreed to broader sharing. Do not imply that a source author is a Global Connect user unless they actually are.
+
+The public plugin deliberately cannot enumerate all requests, inspect individual route targets, read response notes, read contact fields, or read private outcome notes. Those are operator-only capabilities.
