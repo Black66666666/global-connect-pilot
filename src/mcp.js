@@ -82,6 +82,13 @@ export async function ensureMcpSchema(env) {
       sent_at TEXT,
       PRIMARY KEY(request_id, source_ref)
     )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS request_outcomes (
+      request_id TEXT PRIMARY KEY,
+      state TEXT NOT NULL DEFAULT 'pending',
+      note TEXT,
+      recorded_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`),
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS write_buckets (
       bucket TEXT PRIMARY KEY,
       count INTEGER NOT NULL DEFAULT 0,
@@ -89,6 +96,7 @@ export async function ensureMcpSchema(env) {
     )`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_routes_request ON routes(request_id)`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_routes_channel ON routes(channel)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_events_request ON events(request_id)`),
   ]);
 }
 
@@ -185,6 +193,18 @@ async function getRoutes(env, id) {
   }));
 }
 
+async function getOutcome(env, id, includeNote = false) {
+  await ensurePilotRoutingData(env);
+  const row = await env.DB.prepare(`
+    SELECT request_id,state,note,recorded_at,updated_at
+    FROM request_outcomes WHERE request_id=? LIMIT 1
+  `).bind(id).first();
+  if (!row) return { request_id: id, state: "pending", recorded_at: null, updated_at: null };
+  if (includeNote) return row;
+  const { note: _note, ...safe } = row;
+  return safe;
+}
+
 async function getStats(env, id) {
   await ensurePilotRoutingData(env);
   const exists = await env.DB.prepare("SELECT id FROM requests WHERE id=? LIMIT 1").bind(id).first();
@@ -215,7 +235,23 @@ async function getStats(env, id) {
       response_rate_from_sent: sent ? responded / sent : 0,
       response_rate_from_viewed: viewed ? responded / viewed : 0,
     },
+    outcome: await getOutcome(env, id, false),
   };
+}
+
+async function getResponses(env, id, includeContact) {
+  await ensurePilotRoutingData(env);
+  const exists = await env.DB.prepare("SELECT id FROM requests WHERE id=? LIMIT 1").bind(id).first();
+  if (!exists) return null;
+  const result = await env.DB.prepare(`
+    SELECT id,source_ref,action,note,contact,created_at
+    FROM events WHERE request_id=? ORDER BY id ASC
+  `).bind(id).all();
+  return (result.results || []).map((row) => {
+    if (includeContact) return row;
+    const { contact: _contact, ...safe } = row;
+    return safe;
+  });
 }
 
 async function createRequest(env, origin, input, isAdmin) {
@@ -273,10 +309,10 @@ async function createRequest(env, origin, input, isAdmin) {
 function createServer(env, request, isAdmin) {
   const origin = new URL(request.url).origin;
   const server = new McpServer(
-    { name: "global-connect", version: "0.3.1" },
+    { name: "global-connect", version: "0.4.0" },
     {
       instructions:
-        "Global Connect turns a real human request into a public-link card and measures routing outcomes. Never expose private responder text, contacts, the global request index, or the operator's route ledger to anonymous callers. A request card is public to anyone who knows its ID or link. Creating a card does not contact anyone. Operator-only tools may register measurable distribution routes.",
+        "Global Connect turns a real human request into a public-link card and measures routing outcomes. Never expose private responder text, contacts, the global request index, or the operator's route ledger to anonymous callers. A request card is public to anyone who knows its ID or link. Creating a card does not contact anyone. Operator-only tools may inspect response content, register distribution routes, and record the real-world outcome after it is actually known.",
     },
   );
 
@@ -306,7 +342,7 @@ function createServer(env, request, isAdmin) {
     "get_request_stats",
     {
       title: "Get aggregate routing statistics for a request",
-      description: "Get aggregate send, open and response counts for a known request ID. Does not reveal route targets, response text, or responder contact details.",
+      description: "Get aggregate send, open and response counts plus the recorded real-world outcome state for a known request ID. Does not reveal route targets, response text, outcome notes, or responder contact details.",
       inputSchema: z.object({ id: z.string().min(1).max(80) }),
       annotations: readAnnotations,
     },
@@ -417,6 +453,24 @@ function createServer(env, request, isAdmin) {
     );
 
     server.registerTool(
+      "get_responses",
+      {
+        title: "Read responses to a Global Connect request",
+        description: "Authorized operator tool. Read response actions and notes for a known request so the operator can act on 'where to look' and referral hints. Contact fields are omitted by default and returned only when include_contact=true.",
+        inputSchema: z.object({
+          id: z.string().min(1).max(80),
+          include_contact: z.boolean().default(false),
+        }),
+        annotations: readAnnotations,
+      },
+      async ({ id, include_contact }) => {
+        const responses = await getResponses(env, id, include_contact);
+        if (!responses) return errorResult("request_not_found", "No request exists with this ID.", { id });
+        return jsonResult({ request_id: id, include_contact, responses });
+      },
+    );
+
+    server.registerTool(
       "register_route",
       {
         title: "Register a request distribution route",
@@ -474,6 +528,47 @@ function createServer(env, request, isAdmin) {
           channel: input.channel,
           status: input.status,
           tracked_url: `${origin}/r/${input.request_id}?ref=${encodeURIComponent(sourceRef)}`,
+        });
+      },
+    );
+
+    server.registerTool(
+      "record_outcome",
+      {
+        title: "Record the real-world outcome of a request",
+        description: "Authorized operator tool. Record whether the request is still pending, actually succeeded according to its success criterion, failed, or expired. The private operator note is never exposed by public MCP tools.",
+        inputSchema: z.object({
+          request_id: z.string().min(1).max(80),
+          state: z.enum(["pending", "succeeded", "failed", "expired"]),
+          note: z.string().max(4000).optional().default(""),
+        }),
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      async ({ request_id, state, note }) => {
+        await ensurePilotRoutingData(env);
+        const requestRow = await env.DB.prepare("SELECT id,status FROM requests WHERE id=? LIMIT 1").bind(request_id).first();
+        if (!requestRow) return errorResult("request_not_found", "Cannot record an outcome for an unknown request.", { id: request_id });
+        const currentTime = new Date().toISOString();
+        await env.DB.prepare(`
+          INSERT INTO request_outcomes(request_id,state,note,recorded_at,updated_at)
+          VALUES(?,?,?,?,?)
+          ON CONFLICT(request_id) DO UPDATE SET
+            state=excluded.state,
+            note=excluded.note,
+            updated_at=excluded.updated_at
+        `).bind(request_id, state, note || null, currentTime, currentTime).run();
+        if (["succeeded", "failed", "expired"].includes(state)) {
+          await env.DB.prepare("UPDATE requests SET status='closed' WHERE id=?").bind(request_id).run();
+        }
+        return jsonResult({
+          recorded: true,
+          request_id,
+          outcome: await getOutcome(env, request_id, true),
         });
       },
     );
