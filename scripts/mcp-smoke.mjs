@@ -9,7 +9,7 @@ function assert(condition, message) {
 }
 
 async function connect(url, name) {
-  const client = new Client({ name, version: "0.3.0" });
+  const client = new Client({ name, version: "0.3.1" });
   const transport = new StreamableHTTPClientTransport(new URL(url));
   await client.connect(transport);
   return client;
@@ -17,7 +17,7 @@ async function connect(url, name) {
 
 async function main() {
   console.log(`MCP public smoke: ${publicUrl}`);
-  const client = await connect(publicUrl, "global-connect-smoke-read");
+  const client = await connect(publicUrl, "global-connect-smoke-public");
 
   const version = client.getServerVersion();
   console.log("Server:", version);
@@ -27,26 +27,23 @@ async function main() {
   const toolNames = listed.tools.map((tool) => tool.name).sort();
   console.log("Public tools:", toolNames.join(", "));
 
-  for (const required of ["list_requests", "get_request", "get_request_stats", "list_routes", "draft_request", "create_request"]) {
+  for (const required of ["get_request", "get_request_stats", "draft_request", "create_request"]) {
     assert(toolNames.includes(required), `Missing public tool: ${required}`);
   }
-  assert(!toolNames.includes("register_route"), "register_route must not be exposed on anonymous MCP URL");
+  for (const forbidden of ["list_requests", "list_routes", "register_route"]) {
+    assert(!toolNames.includes(forbidden), `${forbidden} must not be exposed on anonymous MCP URL`);
+  }
 
   const request = await client.callTool({ name: "get_request", arguments: { id: "berlin70s1" } });
   assert(!request.isError, "get_request failed for berlin70s1");
-
-  const routes = await client.callTool({ name: "list_routes", arguments: { id: "berlin70s1" } });
-  assert(!routes.isError, "list_routes failed for berlin70s1");
-  const routeData = routes.structuredContent;
-  assert(Array.isArray(routeData?.routes), "list_routes did not return routes");
-  assert(routeData.routes.length >= 6, "berlin70s1 must expose the six seeded distribution routes");
 
   const stats = await client.callTool({ name: "get_request_stats", arguments: { id: "berlin70s1" } });
   assert(!stats.isError, "get_request_stats failed for berlin70s1");
   const statData = stats.structuredContent;
   assert(Number(statData?.totals?.sent || 0) >= 6, "berlin70s1 must report at least six sent routes");
+  assert(!("routes" in (statData || {})), "Public statistics must not expose the route ledger");
 
-  console.log("Read smoke: PASS");
+  console.log("Public read smoke: PASS");
 
   if (testPublicCreate) {
     const created = await client.callTool({
@@ -79,8 +76,14 @@ async function main() {
   const writer = await connect(writeUrl, "global-connect-smoke-admin");
   const adminTools = await writer.listTools();
   const adminNames = adminTools.tools.map((tool) => tool.name);
-  assert(adminNames.includes("create_request"), "Missing create_request tool on admin MCP URL");
-  assert(adminNames.includes("register_route"), "Missing protected register_route tool");
+  for (const required of ["create_request", "list_requests", "list_routes", "register_route"]) {
+    assert(adminNames.includes(required), `Missing admin tool: ${required}`);
+  }
+
+  const routes = await writer.callTool({ name: "list_routes", arguments: { id: "berlin70s1" } });
+  assert(!routes.isError, "admin list_routes failed for berlin70s1");
+  assert(Array.isArray(routes.structuredContent?.routes), "admin list_routes did not return routes");
+  assert(routes.structuredContent.routes.length >= 6, "admin route ledger must contain the six seeded routes");
 
   console.log("Admin smoke: PASS");
   await writer.close();
