@@ -46,21 +46,32 @@ async function main() {
   console.log("Public read smoke: PASS");
 
   if (testPublicCreate) {
+    const smokeGoal = `Public MCP smoke-test request ${Date.now()} — safe to ignore`;
     const created = await client.callTool({
       name: "create_request",
       arguments: {
-        goal: "Public MCP smoke-test request — safe to delete",
+        goal: smokeGoal,
         deadline: "1 day",
         budget: "0",
         constraints: "Technical smoke test only",
-        success_criteria: "Public create_request returns a public card URL",
+        success_criteria: "Public create_request returns a renderable public card URL",
         attention_budget: 0,
         language: "en"
       }
     });
     assert(!created.isError, "public create_request smoke failed");
     assert(created.structuredContent?.id, "public create_request did not return an ID");
-    console.log("Public create smoke: PASS", created.structuredContent.public_url);
+    assert(created.structuredContent?.public_url, "public create_request did not return a public URL");
+
+    const cardResponse = await fetch(created.structuredContent.public_url, {
+      headers: { "cache-control": "no-cache" }
+    });
+    const cardHtml = await cardResponse.text();
+    assert(cardResponse.ok, `created card returned HTTP ${cardResponse.status}`);
+    assert(cardHtml.includes(smokeGoal), "created card page does not contain the submitted goal");
+    assert(cardHtml.includes("How can you help?"), "created card page did not render the MCP English response UI");
+
+    console.log("Public create + render smoke: PASS", created.structuredContent.public_url);
   } else {
     console.log("Public create smoke: SKIPPED (set MCP_TEST_PUBLIC_CREATE=1 explicitly to create a test card)");
   }
