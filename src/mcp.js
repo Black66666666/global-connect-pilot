@@ -131,7 +131,6 @@ async function consumePublicCreateQuota(env) {
     allowed: count <= PUBLIC_CREATE_LIMIT_PER_HOUR,
     count,
     limit: PUBLIC_CREATE_LIMIT_PER_HOUR,
-    bucket,
   };
 }
 
@@ -203,7 +202,6 @@ async function getStats(env, id) {
       (SELECT COUNT(*) FROM events WHERE request_id=? AND action='pass') AS pass
   `).bind(id,id,id,id,id,id,id,id).first();
 
-  const routes = await getRoutes(env, id);
   const numericTotals = Object.fromEntries(Object.entries(totals || {}).map(([key,value]) => [key, Number(value || 0)]));
   const sent = numericTotals.sent || 0;
   const viewed = numericTotals.viewed || 0;
@@ -217,7 +215,6 @@ async function getStats(env, id) {
       response_rate_from_sent: sent ? responded / sent : 0,
       response_rate_from_viewed: viewed ? responded / viewed : 0,
     },
-    routes,
   };
 }
 
@@ -276,10 +273,10 @@ async function createRequest(env, origin, input, isAdmin) {
 function createServer(env, request, isAdmin) {
   const origin = new URL(request.url).origin;
   const server = new McpServer(
-    { name: "global-connect", version: "0.3.0" },
+    { name: "global-connect", version: "0.3.1" },
     {
       instructions:
-        "Global Connect routes real human requests through measurable referral paths. Read current request and route state before reporting results. Never expose private responder contact fields. Use a unique source_ref for every distribution route. A request card is public to anyone with its link. Creating a card does not contact anyone. Registering a route changes the internal routing ledger and is available only to an authorized operator.",
+        "Global Connect turns a real human request into a public-link card and measures routing outcomes. Never expose private responder text, contacts, the global request index, or the operator's route ledger to anonymous callers. A request card is public to anyone who knows its ID or link. Creating a card does not contact anyone. Operator-only tools may register measurable distribution routes.",
     },
   );
 
@@ -291,47 +288,10 @@ function createServer(env, request, isAdmin) {
   };
 
   server.registerTool(
-    "list_requests",
-    {
-      title: "List Global Connect requests",
-      description: "List recent public Global Connect request cards with non-sensitive metadata. Use this to inspect existing requests before creating duplicates.",
-      inputSchema: z.object({
-        status: z.enum(["open", "lead", "closed"]).optional(),
-        limit: z.number().int().min(1).max(50).default(20),
-      }),
-      annotations: readAnnotations,
-    },
-    async ({ status, limit }) => {
-      await ensurePilotRoutingData(env);
-      let query = `
-        SELECT r.id,r.goal,r.deadline,r.budget,r.status,r.created_at,
-               COALESCE(m.language,'unknown') AS language,
-               COALESCE(m.created_via,'web') AS created_via,
-               (SELECT COUNT(*) FROM routes rt WHERE rt.request_id=r.id AND rt.status IN ('sent','viewed','responded')) AS routes_sent
-        FROM requests r LEFT JOIN request_meta m ON m.request_id=r.id
-      `;
-      const bindings = [];
-      if (status) {
-        query += " WHERE r.status=?";
-        bindings.push(status);
-      }
-      query += " ORDER BY r.created_at DESC LIMIT ?";
-      bindings.push(limit);
-      const result = await env.DB.prepare(query).bind(...bindings).all();
-      const requests = (result.results || []).map((row) => ({
-        ...row,
-        routes_sent: Number(row.routes_sent || 0),
-        public_url: `${origin}/r/${row.id}`,
-      }));
-      return jsonResult({ requests });
-    },
-  );
-
-  server.registerTool(
     "get_request",
     {
-      title: "Get Global Connect request",
-      description: "Get one public request card and its public URL. Does not return private responder notes or contact details.",
+      title: "Get a Global Connect request by ID",
+      description: "Get one public-link request card when its ID is already known. Does not enumerate other requests and never returns private responder notes or contact details.",
       inputSchema: z.object({ id: z.string().min(1).max(80) }),
       annotations: readAnnotations,
     },
@@ -345,29 +305,14 @@ function createServer(env, request, isAdmin) {
   server.registerTool(
     "get_request_stats",
     {
-      title: "Get request routing statistics",
-      description: "Get registered sends, opens, responses, response types and per-route performance for one request. Never returns private response text or contact details.",
+      title: "Get aggregate routing statistics for a request",
+      description: "Get aggregate send, open and response counts for a known request ID. Does not reveal route targets, response text, or responder contact details.",
       inputSchema: z.object({ id: z.string().min(1).max(80) }),
       annotations: readAnnotations,
     },
     async ({ id }) => {
       const stats = await getStats(env, id);
       return stats ? jsonResult(stats) : errorResult("request_not_found", "No request exists with this ID.", { id });
-    },
-  );
-
-  server.registerTool(
-    "list_routes",
-    {
-      title: "List distribution routes for a request",
-      description: "List every registered distribution route for a request, including channel, non-sensitive target label, send/open/response state and aggregate response types.",
-      inputSchema: z.object({ id: z.string().min(1).max(80) }),
-      annotations: readAnnotations,
-    },
-    async ({ id }) => {
-      const row = await getPublicRequest(env, id);
-      if (!row) return errorResult("request_not_found", "No request exists with this ID.", { id });
-      return jsonResult({ request_id: id, routes: await getRoutes(env, id) });
     },
   );
 
@@ -396,7 +341,7 @@ function createServer(env, request, isAdmin) {
     "create_request",
     {
       title: "Create a public Global Connect request card",
-      description: "Create a public-link Global Connect request card only after the user explicitly asks to create or publish one. The card may contain a public source URL. This writes to Global Connect and returns a shareable public URL, but it does not email, message, post to, or otherwise contact anyone. Anonymous creation is rate-limited.",
+      description: "Create a public-link request card only after the user explicitly asks to create or publish one. This writes the supplied request content to Global Connect and returns a shareable public URL. It does not email, message, post to, or otherwise contact anyone. Anonymous creation is rate-limited.",
       inputSchema: z.object({
         goal: z.string().min(3).max(2000),
         deadline: z.string().max(300).optional().default(""),
@@ -419,6 +364,58 @@ function createServer(env, request, isAdmin) {
   );
 
   if (isAdmin) {
+    server.registerTool(
+      "list_requests",
+      {
+        title: "List Global Connect requests",
+        description: "Authorized operator tool. List recent request cards and non-sensitive metadata to manage the routing pilot.",
+        inputSchema: z.object({
+          status: z.enum(["open", "lead", "closed"]).optional(),
+          limit: z.number().int().min(1).max(50).default(20),
+        }),
+        annotations: readAnnotations,
+      },
+      async ({ status, limit }) => {
+        await ensurePilotRoutingData(env);
+        let query = `
+          SELECT r.id,r.goal,r.deadline,r.budget,r.status,r.created_at,
+                 COALESCE(m.language,'unknown') AS language,
+                 COALESCE(m.created_via,'web') AS created_via,
+                 (SELECT COUNT(*) FROM routes rt WHERE rt.request_id=r.id AND rt.status IN ('sent','viewed','responded')) AS routes_sent
+          FROM requests r LEFT JOIN request_meta m ON m.request_id=r.id
+        `;
+        const bindings = [];
+        if (status) {
+          query += " WHERE r.status=?";
+          bindings.push(status);
+        }
+        query += " ORDER BY r.created_at DESC LIMIT ?";
+        bindings.push(limit);
+        const result = await env.DB.prepare(query).bind(...bindings).all();
+        const requests = (result.results || []).map((row) => ({
+          ...row,
+          routes_sent: Number(row.routes_sent || 0),
+          public_url: `${origin}/r/${row.id}`,
+        }));
+        return jsonResult({ requests });
+      },
+    );
+
+    server.registerTool(
+      "list_routes",
+      {
+        title: "List distribution routes for a request",
+        description: "Authorized operator tool. List registered distribution routes including non-sensitive target labels and per-route send/open/response state.",
+        inputSchema: z.object({ id: z.string().min(1).max(80) }),
+        annotations: readAnnotations,
+      },
+      async ({ id }) => {
+        const row = await getPublicRequest(env, id);
+        if (!row) return errorResult("request_not_found", "No request exists with this ID.", { id });
+        return jsonResult({ request_id: id, routes: await getRoutes(env, id) });
+      },
+    );
+
     server.registerTool(
       "register_route",
       {
