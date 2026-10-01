@@ -6,6 +6,7 @@
   "scripts": {
     "deploy": "node scripts/deploy.mjs",
     "check:build": "node scripts/check-build.mjs",
+    "check:plugin": "node scripts/check-plugin.mjs",
     "smoke:mcp": "node scripts/mcp-smoke.mjs"
   },
   "dependencies": {
