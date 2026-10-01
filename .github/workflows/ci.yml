@@ -30,3 +30,4 @@ jobs:
         run: node scripts/remote-smoke.mjs
         env:
           GC_EXPECTED_VERSION: 0.3.1
+          MCP_TEST_PUBLIC_CREATE: 1
