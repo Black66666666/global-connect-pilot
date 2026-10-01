@@ -24,3 +24,9 @@ jobs:
 
       - name: Cloudflare Worker dry-run build
         run: npm run check:build
+
+      - name: Wait for Cloudflare deployment and smoke-test public MCP
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: node scripts/remote-smoke.mjs
+        env:
+          GC_EXPECTED_VERSION: 0.3.1
