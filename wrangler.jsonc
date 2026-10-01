@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "global-connect-pilot",
-  "main": "src/worker.js",
+  "main": "src/root.js",
   "compatibility_date": "2026-09-27",
   "d1_databases": [
     {
