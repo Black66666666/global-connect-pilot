@@ -43,7 +43,7 @@ execFileSync("npm", ["run", "smoke:mcp"], {
   env: {
     ...process.env,
     MCP_URL: `${baseUrl}/mcp`,
-    MCP_TEST_PUBLIC_CREATE: "0"
+    MCP_TEST_PUBLIC_CREATE: process.env.MCP_TEST_PUBLIC_CREATE || "0"
   }
 });
 
