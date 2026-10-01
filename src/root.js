@@ -75,7 +75,7 @@ async function renderMcpCard(request, env, id) {
     row = await env.DB.prepare(`
       SELECT r.*,m.language,m.source_url,m.source_label,m.created_via
       FROM requests r JOIN request_meta m ON m.request_id=r.id
-      WHERE r.id=? AND m.created_via='mcp' LIMIT 1
+      WHERE r.id=? AND m.created_via LIKE 'mcp%' LIMIT 1
     `).bind(id).first();
   } catch {
     return null;
@@ -171,7 +171,7 @@ export default {
     if (url.pathname === "/terms") return publicInfoPage("terms");
     if (url.pathname === "/support") return publicInfoPage("support");
     if (url.pathname === "/mcp-health") {
-      return Response.json({ ok: true, service: "global-connect-mcp", version: "0.2.0" });
+      return Response.json({ ok: true, service: "global-connect-mcp", version: "0.3.1" });
     }
     if (url.pathname === "/.well-known/openai-apps-challenge") {
       if (!env.OPENAI_APPS_CHALLENGE) return new Response("Not configured", { status: 404 });
