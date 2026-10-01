@@ -1,6 +1,8 @@
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
+const PUBLIC_CREATE_LIMIT_PER_HOUR = 50;
+
 const SEEDED_ROUTES = [
   { request_id: "berlin70s1", source_ref: "noisy_kalle_01", channel: "email", target_label: "Kalle — Berlin blues/rock/funk sessions", sent_at: "2026-10-01T18:46:41.600Z" },
   { request_id: "berlin70s1", source_ref: "noisy_rooms_01", channel: "email", target_label: "Noisy Rooms community", sent_at: "2026-10-01T18:46:50.270Z" },
@@ -80,6 +82,11 @@ export async function ensureMcpSchema(env) {
       sent_at TEXT,
       PRIMARY KEY(request_id, source_ref)
     )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS write_buckets (
+      bucket TEXT PRIMARY KEY,
+      count INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL
+    )`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_routes_request ON routes(request_id)`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_routes_channel ON routes(channel)`),
   ]);
@@ -87,7 +94,7 @@ export async function ensureMcpSchema(env) {
 
 export async function ensurePilotRoutingData(env) {
   await ensureMcpSchema(env);
-  const now = new Date().toISOString();
+  const currentTime = new Date().toISOString();
   for (const route of SEEDED_ROUTES) {
     await env.DB.prepare(`
       INSERT OR IGNORE INTO routes(
@@ -100,10 +107,32 @@ export async function ensurePilotRoutingData(env) {
       route.target_label,
       null,
       "sent",
-      route.sent_at || now,
-      route.sent_at || now,
+      route.sent_at || currentTime,
+      route.sent_at || currentTime,
     ).run();
   }
+}
+
+async function consumePublicCreateQuota(env) {
+  await ensureMcpSchema(env);
+  const currentTime = new Date().toISOString();
+  const bucket = `public-create:${currentTime.slice(0, 13)}`;
+  const row = await env.DB.prepare(`
+    INSERT INTO write_buckets(bucket,count,updated_at)
+    VALUES(?,1,?)
+    ON CONFLICT(bucket) DO UPDATE SET
+      count=write_buckets.count+1,
+      updated_at=excluded.updated_at
+    RETURNING count
+  `).bind(bucket, currentTime).first();
+
+  const count = Number(row?.count || 1);
+  return {
+    allowed: count <= PUBLIC_CREATE_LIMIT_PER_HOUR,
+    count,
+    limit: PUBLIC_CREATE_LIMIT_PER_HOUR,
+    bucket,
+  };
 }
 
 async function getPublicRequest(env, id) {
@@ -175,7 +204,7 @@ async function getStats(env, id) {
   `).bind(id,id,id,id,id,id,id,id).first();
 
   const routes = await getRoutes(env, id);
-  const numericTotals = Object.fromEntries(Object.entries(totals || {}).map(([k,v]) => [k, Number(v || 0)]));
+  const numericTotals = Object.fromEntries(Object.entries(totals || {}).map(([key,value]) => [key, Number(value || 0)]));
   const sent = numericTotals.sent || 0;
   const viewed = numericTotals.viewed || 0;
   const responded = numericTotals.responded || 0;
@@ -192,26 +221,85 @@ async function getStats(env, id) {
   };
 }
 
-function createServer(env, request, canWrite) {
+async function createRequest(env, origin, input, isAdmin) {
+  await ensurePilotRoutingData(env);
+  if (!isAdmin) {
+    const quota = await consumePublicCreateQuota(env);
+    if (!quota.allowed) {
+      return errorResult(
+        "public_create_rate_limited",
+        "The anonymous request-card creation limit for this hour has been reached. Try again later.",
+        { limit_per_hour: quota.limit },
+      );
+    }
+  }
+
+  const id = randomId();
+  const createdAt = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare(`
+      INSERT INTO requests(id,goal,deadline,budget,constraints,success_criteria,attention_budget,status,created_at)
+      VALUES(?,?,?,?,?,?,?,?,?)
+    `).bind(
+      id,
+      input.goal.trim(),
+      input.deadline?.trim() || "",
+      input.budget?.trim() || "",
+      input.constraints?.trim() || "",
+      input.success_criteria?.trim() || "",
+      input.attention_budget ?? 3,
+      "open",
+      createdAt,
+    ),
+    env.DB.prepare(`
+      INSERT INTO request_meta(request_id,language,source_url,source_label,created_via)
+      VALUES(?,?,?,?,?)
+    `).bind(
+      id,
+      input.language || "en",
+      input.source_url || null,
+      input.source_label || null,
+      isAdmin ? "mcp-admin" : "mcp-public",
+    ),
+  ]);
+
+  return jsonResult({
+    created: true,
+    id,
+    public_url: `${origin}/r/${id}`,
+    status: "open",
+    visibility: "public-link",
+    contacted_anyone: false,
+  });
+}
+
+function createServer(env, request, isAdmin) {
   const origin = new URL(request.url).origin;
   const server = new McpServer(
-    { name: "global-connect", version: "0.2.0" },
+    { name: "global-connect", version: "0.3.0" },
     {
       instructions:
-        "Global Connect routes real human requests through measurable referral paths. Read current request and route state before reporting results. Never expose private responder contact fields. Use a unique source_ref for every distribution route. Creating a request or registering a route changes server state and should only happen when the user explicitly wants that action.",
+        "Global Connect routes real human requests through measurable referral paths. Read current request and route state before reporting results. Never expose private responder contact fields. Use a unique source_ref for every distribution route. A request card is public to anyone with its link. Creating a card does not contact anyone. Registering a route changes the internal routing ledger and is available only to an authorized operator.",
     },
   );
+
+  const readAnnotations = {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  };
 
   server.registerTool(
     "list_requests",
     {
       title: "List Global Connect requests",
-      description: "List recent Global Connect request cards with public metadata only. Use this to inspect existing requests before creating duplicates.",
+      description: "List recent public Global Connect request cards with non-sensitive metadata. Use this to inspect existing requests before creating duplicates.",
       inputSchema: z.object({
         status: z.enum(["open", "lead", "closed"]).optional(),
         limit: z.number().int().min(1).max(50).default(20),
       }),
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      annotations: readAnnotations,
     },
     async ({ status, limit }) => {
       await ensurePilotRoutingData(env);
@@ -243,9 +331,9 @@ function createServer(env, request, canWrite) {
     "get_request",
     {
       title: "Get Global Connect request",
-      description: "Get one request card and its public URL. Does not return private responder notes or contact details.",
+      description: "Get one public request card and its public URL. Does not return private responder notes or contact details.",
       inputSchema: z.object({ id: z.string().min(1).max(80) }),
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      annotations: readAnnotations,
     },
     async ({ id }) => {
       const row = await getPublicRequest(env, id);
@@ -258,9 +346,9 @@ function createServer(env, request, canWrite) {
     "get_request_stats",
     {
       title: "Get request routing statistics",
-      description: "Get the number of registered routes, sends, opens, responses and response types for one request. Includes per-ref route performance but never responder contact details.",
+      description: "Get registered sends, opens, responses, response types and per-route performance for one request. Never returns private response text or contact details.",
       inputSchema: z.object({ id: z.string().min(1).max(80) }),
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      annotations: readAnnotations,
     },
     async ({ id }) => {
       const stats = await getStats(env, id);
@@ -274,7 +362,7 @@ function createServer(env, request, canWrite) {
       title: "List distribution routes for a request",
       description: "List every registered distribution route for a request, including channel, non-sensitive target label, send/open/response state and aggregate response types.",
       inputSchema: z.object({ id: z.string().min(1).max(80) }),
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      annotations: readAnnotations,
     },
     async ({ id }) => {
       const row = await getPublicRequest(env, id);
@@ -287,7 +375,7 @@ function createServer(env, request, canWrite) {
     "draft_request",
     {
       title: "Draft a Global Connect request",
-      description: "Normalize a proposed real-world request card without saving it. Use this before creation when requirements or success criteria need review.",
+      description: "Normalize a proposed real-world request card without saving or publishing anything. Use this when requirements or success criteria need review.",
       inputSchema: z.object({
         goal: z.string().min(3).max(2000),
         deadline: z.string().max(300).optional().default(""),
@@ -299,79 +387,43 @@ function createServer(env, request, canWrite) {
         source_url: z.string().url().optional(),
         source_label: z.string().max(300).optional(),
       }),
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      annotations: readAnnotations,
     },
-    async (input) => jsonResult({ draft: input, saved: false }),
+    async (input) => jsonResult({ draft: input, saved: false, public: false }),
   );
 
-  if (canWrite) {
-    server.registerTool(
-      "create_request",
-      {
-        title: "Create a Global Connect request card",
-        description: "Create and persist a new public Global Connect request card after the user explicitly asks to create it. Returns the public card URL. This changes Global Connect state but does not contact anyone.",
-        inputSchema: z.object({
-          goal: z.string().min(3).max(2000),
-          deadline: z.string().max(300).optional().default(""),
-          budget: z.string().max(300).optional().default(""),
-          constraints: z.string().max(4000).optional().default(""),
-          success_criteria: z.string().max(4000).optional().default(""),
-          attention_budget: z.number().int().min(0).max(20).default(3),
-          language: z.enum(["en", "ru"]).default("en"),
-          source_url: z.string().url().optional(),
-          source_label: z.string().max(300).optional(),
-        }),
-        annotations: {
-          readOnlyHint: false,
-          destructiveHint: false,
-          idempotentHint: false,
-          openWorldHint: false,
-        },
+  server.registerTool(
+    "create_request",
+    {
+      title: "Create a public Global Connect request card",
+      description: "Create a public-link Global Connect request card only after the user explicitly asks to create or publish one. The card may contain a public source URL. This writes to Global Connect and returns a shareable public URL, but it does not email, message, post to, or otherwise contact anyone. Anonymous creation is rate-limited.",
+      inputSchema: z.object({
+        goal: z.string().min(3).max(2000),
+        deadline: z.string().max(300).optional().default(""),
+        budget: z.string().max(300).optional().default(""),
+        constraints: z.string().max(4000).optional().default(""),
+        success_criteria: z.string().max(4000).optional().default(""),
+        attention_budget: z.number().int().min(0).max(20).default(3),
+        language: z.enum(["en", "ru"]).default("en"),
+        source_url: z.string().url().optional(),
+        source_label: z.string().max(300).optional(),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
       },
-      async (input) => {
-        await ensurePilotRoutingData(env);
-        const id = randomId();
-        const createdAt = new Date().toISOString();
-        await env.DB.batch([
-          env.DB.prepare(`
-            INSERT INTO requests(id,goal,deadline,budget,constraints,success_criteria,attention_budget,status,created_at)
-            VALUES(?,?,?,?,?,?,?,?,?)
-          `).bind(
-            id,
-            input.goal.trim(),
-            input.deadline?.trim() || "",
-            input.budget?.trim() || "",
-            input.constraints?.trim() || "",
-            input.success_criteria?.trim() || "",
-            input.attention_budget ?? 3,
-            "open",
-            createdAt,
-          ),
-          env.DB.prepare(`
-            INSERT INTO request_meta(request_id,language,source_url,source_label,created_via)
-            VALUES(?,?,?,?,?)
-          `).bind(
-            id,
-            input.language || "en",
-            input.source_url || null,
-            input.source_label || null,
-            "mcp",
-          ),
-        ]);
-        return jsonResult({
-          created: true,
-          id,
-          public_url: `${origin}/r/${id}`,
-          status: "open",
-        });
-      },
-    );
+    },
+    async (input) => createRequest(env, origin, input, isAdmin),
+  );
 
+  if (isAdmin) {
     server.registerTool(
       "register_route",
       {
         title: "Register a request distribution route",
-        description: "Record one planned or already-sent distribution route for a request and return a trackable card link. This only updates the Global Connect routing ledger; it does not send or post the card externally.",
+        description: "Authorized operator tool. Record one planned or already-sent distribution route and return a trackable card link. This changes only the Global Connect routing ledger; it does not send or post anything externally.",
         inputSchema: z.object({
           request_id: z.string().min(1).max(80),
           source_ref: z.string().min(1).max(64).optional(),
@@ -436,7 +488,7 @@ function createServer(env, request, canWrite) {
 export async function handleMcp(request, env) {
   const url = new URL(request.url);
   const suppliedKey = url.searchParams.get("key") || "";
-  const canWrite = Boolean(env.GC_ADMIN_TOKEN) && suppliedKey === env.GC_ADMIN_TOKEN;
-  const handler = createMcpHandler(() => createServer(env, request, canWrite));
+  const isAdmin = Boolean(env.GC_ADMIN_TOKEN) && suppliedKey === env.GC_ADMIN_TOKEN;
+  const handler = createMcpHandler(() => createServer(env, request, isAdmin));
   return handler.fetch(request);
 }
