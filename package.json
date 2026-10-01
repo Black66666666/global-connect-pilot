@@ -1,9 +1,14 @@
 {
   "name": "global-connect-pilot",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "deploy": "node scripts/deploy.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.2.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "wrangler": "^4.141.0"
