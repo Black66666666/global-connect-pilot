@@ -9,7 +9,7 @@ function assert(condition, message) {
 }
 
 async function connect(url, name) {
-  const client = new Client({ name, version: "0.3.1" });
+  const client = new Client({ name, version: "0.4.0" });
   const transport = new StreamableHTTPClientTransport(new URL(url));
   await client.connect(transport);
   return client;
@@ -22,6 +22,7 @@ async function main() {
   const version = client.getServerVersion();
   console.log("Server:", version);
   assert(version?.name === "global-connect", "Unexpected MCP server name");
+  assert(version?.version === "0.4.0", `Unexpected MCP server version: ${version?.version}`);
 
   const listed = await client.listTools();
   const toolNames = listed.tools.map((tool) => tool.name).sort();
@@ -30,7 +31,7 @@ async function main() {
   for (const required of ["get_request", "get_request_stats", "draft_request", "create_request"]) {
     assert(toolNames.includes(required), `Missing public tool: ${required}`);
   }
-  for (const forbidden of ["list_requests", "list_routes", "register_route"]) {
+  for (const forbidden of ["list_requests", "list_routes", "get_responses", "register_route", "record_outcome"]) {
     assert(!toolNames.includes(forbidden), `${forbidden} must not be exposed on anonymous MCP URL`);
   }
 
@@ -42,6 +43,8 @@ async function main() {
   const statData = stats.structuredContent;
   assert(Number(statData?.totals?.sent || 0) >= 6, "berlin70s1 must report at least six sent routes");
   assert(!("routes" in (statData || {})), "Public statistics must not expose the route ledger");
+  assert(statData?.outcome?.state, "Public statistics must expose the non-sensitive outcome state");
+  assert(!("note" in (statData?.outcome || {})), "Public outcome must not expose the private operator note");
 
   console.log("Public read smoke: PASS");
 
@@ -87,7 +90,7 @@ async function main() {
   const writer = await connect(writeUrl, "global-connect-smoke-admin");
   const adminTools = await writer.listTools();
   const adminNames = adminTools.tools.map((tool) => tool.name);
-  for (const required of ["create_request", "list_requests", "list_routes", "register_route"]) {
+  for (const required of ["create_request", "list_requests", "list_routes", "get_responses", "register_route", "record_outcome"]) {
     assert(adminNames.includes(required), `Missing admin tool: ${required}`);
   }
 
@@ -95,6 +98,10 @@ async function main() {
   assert(!routes.isError, "admin list_routes failed for berlin70s1");
   assert(Array.isArray(routes.structuredContent?.routes), "admin list_routes did not return routes");
   assert(routes.structuredContent.routes.length >= 6, "admin route ledger must contain the six seeded routes");
+
+  const responses = await writer.callTool({ name: "get_responses", arguments: { id: "berlin70s1", include_contact: false } });
+  assert(!responses.isError, "admin get_responses failed for berlin70s1");
+  assert(Array.isArray(responses.structuredContent?.responses), "admin get_responses did not return a response list");
 
   console.log("Admin smoke: PASS");
   await writer.close();
