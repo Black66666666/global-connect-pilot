@@ -22,6 +22,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Validate plugin package
+        run: npm run check:plugin
+
       - name: Cloudflare Worker dry-run build
         run: npm run check:build
 
