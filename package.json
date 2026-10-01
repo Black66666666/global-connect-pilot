@@ -1,16 +1,18 @@
 {
   "name": "global-connect-pilot",
-  "version": "0.10.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "node scripts/deploy.mjs"
+    "deploy": "node scripts/deploy.mjs",
+    "smoke:mcp": "node scripts/mcp-smoke.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.2.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "^2.2.0",
     "wrangler": "^4.141.0"
   }
 }
