@@ -1,24 +1,31 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "global-connect",
-  "version": "0.1.0",
-  "description": "Route real human requests through shareable cards, communities and measurable referral paths.",
+  "version": "0.2.0",
+  "description": "Route real human requests through shareable cards and measurable referral paths.",
+  "author": {
+    "name": "Global Connect",
+    "email": "globalconnect-pilot@agentmail.to",
+    "url": "https://global-connect-pilot.biv-ai-lab.workers.dev/plugin"
+  },
+  "homepage": "https://global-connect-pilot.biv-ai-lab.workers.dev/plugin",
   "repository": "https://github.com/Black66666666/global-connect-pilot",
   "keywords": ["routing", "requests", "communities", "human-help", "referrals"],
   "extensions": {
     "com.openai": {
+      "onboardingSkill": "./skills/global-connect/SKILL.md",
       "interface": {
         "displayName": "Global Connect",
-        "shortDescription": "Route a real request to the right people and communities",
-        "longDescription": "Create and inspect portable request cards, measure referral routes, and progressively connect distribution channels such as email, Reddit, Discord and Telegram.",
-        "developerName": "Global Connect",
-        "category": "Productivity",
-        "capabilities": ["Read", "Write"],
-        "websiteURL": "https://global-connect-pilot.biv-ai-lab.workers.dev",
+        "shortDescription": "Route a real request through people and communities",
+        "longDescription": "Turn a real-world request into a portable card, register measurable distribution routes, and compare which people or communities actually open, respond, redirect, or solve it.",
+        "websiteURL": "https://global-connect-pilot.biv-ai-lab.workers.dev/plugin",
+        "supportURL": "https://global-connect-pilot.biv-ai-lab.workers.dev/support",
+        "privacyPolicyURL": "https://global-connect-pilot.biv-ai-lab.workers.dev/privacy",
+        "termsOfServiceURL": "https://global-connect-pilot.biv-ai-lab.workers.dev/terms",
         "defaultPrompt": [
           "Show my active Global Connect requests and their routing results.",
           "Draft a Global Connect card for this real-world request.",
-          "Create a request card and return its public link."
+          "Compare the distribution routes for this request."
         ],
         "brandColor": "#18181B"
       }
