@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 function fail(message) {
   console.error(`Plugin package check: FAIL — ${message}`);
@@ -18,11 +18,20 @@ const openai = plugin.extensions?.["com.openai"];
 if (!openai) fail("missing extensions.com.openai");
 
 const ui = openai.interface || {};
-for (const key of ["displayName", "shortDescription", "longDescription", "websiteURL", "supportURL", "privacyPolicyURL", "termsOfServiceURL"]) {
+for (const key of ["displayName", "shortDescription", "longDescription", "developerName", "category", "websiteURL", "supportURL", "privacyPolicyURL", "termsOfServiceURL", "composerIcon", "logo"]) {
   if (!ui[key]) fail(`missing interface.${key}`);
 }
+if (String(ui.displayName).length > 30) fail("displayName exceeds 30 characters");
+if (String(ui.shortDescription).length > 30) fail("shortDescription exceeds 30 characters");
 for (const key of ["websiteURL", "supportURL", "privacyPolicyURL", "termsOfServiceURL"]) {
   if (!String(ui[key]).startsWith("https://")) fail(`${key} must use HTTPS`);
+}
+for (const key of ["composerIcon", "logo"]) {
+  const value = String(ui[key]);
+  if (!value.startsWith("./")) fail(`${key} must be a ./-prefixed package-relative path`);
+  const localPath = value.slice(2);
+  if (!existsSync(localPath)) fail(`${key} file does not exist: ${localPath}`);
+  if (!/\.(png|jpe?g|webp|svg)$/i.test(localPath)) fail(`${key} uses an unsupported image extension`);
 }
 
 const review = openai.review;
@@ -50,4 +59,4 @@ const server = servers["global-connect"];
 if (server.type !== "streamable-http") fail("MCP server type must be streamable-http");
 if (server.url !== "https://global-connect-pilot.biv-ai-lab.workers.dev/mcp") fail("unexpected production MCP URL");
 
-console.log(`Plugin package check: PASS — ${plugin.name} v${plugin.version}, ${positive.length} positive + ${negative.length} negative cases`);
+console.log(`Plugin package check: PASS — ${plugin.name} v${plugin.version}, ${positive.length} positive + ${negative.length} negative cases, directory icon present`);
