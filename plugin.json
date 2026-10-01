@@ -16,8 +16,16 @@
       "onboardingSkill": "./skills/global-connect/SKILL.md",
       "interface": {
         "displayName": "Global Connect",
-        "shortDescription": "Create and route a real request through people and communities",
-        "longDescription": "Create a portable public-link request card, preserve its real source and success criteria, and measure aggregate routing outcomes. Authorized operators can additionally inspect response content, register individual distribution routes, and record the real-world outcome without exposing private responder data publicly.",
+        "shortDescription": "Route real human requests",
+        "longDescription": "Create a portable public-link request card from a real-world need, preserve its public source and success criteria, and measure aggregate routing outcomes. Global Connect is intended for requests where another person or community may know who can help or where to look. Creating a card does not distribute it. Anonymous users cannot enumerate all requests, inspect individual route targets, read private response text, or access responder contacts.",
+        "developerName": "Global Connect",
+        "category": "Productivity",
+        "capabilities": [
+          "Draft public request cards",
+          "Create shareable request cards",
+          "Read known request cards",
+          "Measure aggregate routing outcomes"
+        ],
         "websiteURL": "https://global-connect-pilot.biv-ai-lab.workers.dev/plugin",
         "supportURL": "https://global-connect-pilot.biv-ai-lab.workers.dev/support",
         "privacyPolicyURL": "https://global-connect-pilot.biv-ai-lab.workers.dev/privacy",
@@ -27,7 +35,9 @@
           "Create a public Global Connect card from this request and return the link.",
           "Check the aggregate routing results for this Global Connect request ID."
         ],
-        "brandColor": "#18181B"
+        "brandColor": "#18181B",
+        "composerIcon": "./assets/global-connect.svg",
+        "logo": "./assets/global-connect.svg"
       },
       "review": {
         "test_cases": {
