@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 
 const baseUrl = process.env.GC_BASE_URL || "https://global-connect-pilot.biv-ai-lab.workers.dev";
 const expectedVersion = process.env.GC_EXPECTED_VERSION || "0.4.0";
+const expectedChallenge = process.env.GC_OPENAI_CHALLENGE || "VONqdSiuFsgS9E6jBPmEa290-C_0eIsRoiOQGpr1An4";
 const attempts = Number(process.env.GC_REMOTE_ATTEMPTS || 24);
 const delayMs = Number(process.env.GC_REMOTE_DELAY_MS || 10000);
 const smokeAttempts = Number(process.env.GC_MCP_SMOKE_ATTEMPTS || 5);
@@ -38,6 +39,23 @@ async function waitForVersion() {
   throw new Error(`Deployed version ${expectedVersion} did not become ready. Last result: ${last}`);
 }
 
+async function verifyOpenAiChallenge() {
+  const url = `${baseUrl}/.well-known/openai-apps-challenge`;
+  const response = await fetch(url, {
+    headers: { "cache-control": "no-cache" },
+    redirect: "manual"
+  });
+  const text = await response.text();
+  console.log(`OpenAI challenge endpoint: HTTP ${response.status}; body=${JSON.stringify(text)}`);
+  if (response.status !== 200) {
+    throw new Error(`OpenAI challenge endpoint returned HTTP ${response.status}`);
+  }
+  if (text !== expectedChallenge) {
+    throw new Error(`OpenAI challenge token mismatch. Expected ${JSON.stringify(expectedChallenge)}, got ${JSON.stringify(text)}`);
+  }
+  console.log("OpenAI domain challenge: PASS");
+}
+
 async function runMcpSmoke() {
   let lastError = null;
   for (let attempt = 1; attempt <= smokeAttempts; attempt += 1) {
@@ -63,4 +81,5 @@ async function runMcpSmoke() {
 }
 
 await waitForVersion();
+await verifyOpenAiChallenge();
 await runMcpSmoke();
