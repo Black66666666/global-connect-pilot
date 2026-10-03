@@ -57,6 +57,6 @@ const names = Object.keys(servers);
 if (names.length !== 1 || names[0] !== "global-connect") fail("mcp.json must define exactly one server named global-connect");
 const server = servers["global-connect"];
 if (server.type !== "streamable-http") fail("MCP server type must be streamable-http");
-if (server.url !== "https://global-connect-pilot.biv-ai-lab.workers.dev/mcp") fail("unexpected production MCP URL");
+if (server.url !== "https://global-connect.specforge.ru/mcp") fail("unexpected production MCP URL");
 
 console.log(`Plugin package check: PASS — ${plugin.name} v${plugin.version}, ${positive.length} positive + ${negative.length} negative cases, directory icon present`);
