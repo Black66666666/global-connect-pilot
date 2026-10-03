@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "global-connect",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Turn a real human request into a shareable card and measure whether routing it through people and communities produces useful help.",
   "author": {
     "name": "Global Connect",
@@ -92,7 +92,7 @@
         "commerce_description": "Global Connect does not sell products or process payments."
       },
       "publication": {
-        "release_notes": "v0.4.0 adds measurable routing outcomes, operator-only response reading and explicit real-world outcome recording, while keeping anonymous public access limited to drafting, card creation, known-card lookup and aggregate statistics. Public request enumeration, route targets, response text and contacts remain private."
+        "release_notes": "v0.4.1 hardens OpenAI domain verification and keeps the public MCP boundary unchanged: anonymous users can draft and create cards, retrieve known cards, and read aggregate routing statistics, while internal routes, private response text, contacts and outcome notes remain operator-only."
       }
     }
   }
