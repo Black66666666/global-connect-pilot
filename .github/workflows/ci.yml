@@ -32,4 +32,4 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: node scripts/remote-smoke.mjs
         env:
-          GC_EXPECTED_VERSION: 0.4.0
+          GC_EXPECTED_VERSION: 0.4.1
