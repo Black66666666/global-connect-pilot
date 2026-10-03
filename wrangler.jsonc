@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "global-connect-pilot",
-  "main": "src/root.js",
+  "main": "src/challenge-wrapper.js",
   "compatibility_date": "2026-09-27",
   "vars": {
     "OPENAI_APPS_CHALLENGE": "VONqdSiuFsgS9E6jBPmEa290-C_0eIsRoiOQGpr1An4"
