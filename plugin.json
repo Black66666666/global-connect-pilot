@@ -1,14 +1,14 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "global-connect",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Turn a real human request into a shareable card and measure whether routing it through people and communities produces useful help.",
   "author": {
     "name": "Global Connect",
     "email": "globalconnect-pilot@agentmail.to",
-    "url": "https://global-connect-pilot.biv-ai-lab.workers.dev/plugin"
+    "url": "https://global-connect.specforge.ru/plugin"
   },
-  "homepage": "https://global-connect-pilot.biv-ai-lab.workers.dev/plugin",
+  "homepage": "https://global-connect.specforge.ru/plugin",
   "repository": "https://github.com/Black66666666/global-connect-pilot",
   "keywords": ["routing", "requests", "communities", "human-help", "referrals"],
   "extensions": {
@@ -26,10 +26,10 @@
           "Read known request cards",
           "Measure aggregate routing outcomes"
         ],
-        "websiteURL": "https://global-connect-pilot.biv-ai-lab.workers.dev/plugin",
-        "supportURL": "https://global-connect-pilot.biv-ai-lab.workers.dev/support",
-        "privacyPolicyURL": "https://global-connect-pilot.biv-ai-lab.workers.dev/privacy",
-        "termsOfServiceURL": "https://global-connect-pilot.biv-ai-lab.workers.dev/terms",
+        "websiteURL": "https://global-connect.specforge.ru/plugin",
+        "supportURL": "https://global-connect.specforge.ru/support",
+        "privacyPolicyURL": "https://global-connect.specforge.ru/privacy",
+        "termsOfServiceURL": "https://global-connect.specforge.ru/terms",
         "defaultPrompt": [
           "Draft a Global Connect card for this real-world request.",
           "Create a public Global Connect card from this request and return the link.",
@@ -92,7 +92,7 @@
         "commerce_description": "Global Connect does not sell products or process payments."
       },
       "publication": {
-        "release_notes": "v0.4.1 hardens OpenAI domain verification and keeps the public MCP boundary unchanged: anonymous users can draft and create cards, retrieve known cards, and read aggregate routing statistics, while internal routes, private response text, contacts and outcome notes remain operator-only."
+        "release_notes": "v0.4.2 moves the public MCP and plugin pages to the verified custom domain global-connect.specforge.ru while keeping the public tool boundary unchanged."
       }
     }
   }
