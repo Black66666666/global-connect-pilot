@@ -3,7 +3,7 @@
   "mcpServers": {
     "global-connect": {
       "type": "streamable-http",
-      "url": "https://global-connect-pilot.biv-ai-lab.workers.dev/mcp"
+      "url": "https://global-connect.specforge.ru/mcp"
     }
   }
 }
