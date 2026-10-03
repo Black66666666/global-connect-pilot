@@ -1,9 +1,11 @@
 import { execFileSync } from "node:child_process";
 
 const baseUrl = process.env.GC_BASE_URL || "https://global-connect-pilot.biv-ai-lab.workers.dev";
-const expectedVersion = process.env.GC_EXPECTED_VERSION || "0.3.1";
+const expectedVersion = process.env.GC_EXPECTED_VERSION || "0.4.0";
 const attempts = Number(process.env.GC_REMOTE_ATTEMPTS || 24);
 const delayMs = Number(process.env.GC_REMOTE_DELAY_MS || 10000);
+const smokeAttempts = Number(process.env.GC_MCP_SMOKE_ATTEMPTS || 5);
+const smokeDelayMs = Number(process.env.GC_MCP_SMOKE_DELAY_MS || 5000);
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -36,15 +38,29 @@ async function waitForVersion() {
   throw new Error(`Deployed version ${expectedVersion} did not become ready. Last result: ${last}`);
 }
 
-await waitForVersion();
-
-execFileSync("npm", ["run", "smoke:mcp"], {
-  stdio: "inherit",
-  env: {
-    ...process.env,
-    MCP_URL: `${baseUrl}/mcp`,
-    MCP_TEST_PUBLIC_CREATE: process.env.MCP_TEST_PUBLIC_CREATE || "0"
+async function runMcpSmoke() {
+  let lastError = null;
+  for (let attempt = 1; attempt <= smokeAttempts; attempt += 1) {
+    try {
+      execFileSync("npm", ["run", "smoke:mcp"], {
+        stdio: "inherit",
+        env: {
+          ...process.env,
+          MCP_URL: `${baseUrl}/mcp`,
+          MCP_TEST_PUBLIC_CREATE: process.env.MCP_TEST_PUBLIC_CREATE || "0"
+        }
+      });
+      console.log(`Deployed Global Connect MCP smoke: PASS on attempt ${attempt}`);
+      return;
+    } catch (error) {
+      lastError = error;
+      console.error(`Deployed MCP smoke attempt ${attempt}/${smokeAttempts}: FAIL`);
+      if (attempt < smokeAttempts) await sleep(smokeDelayMs);
+    }
   }
-});
 
-console.log("Deployed Global Connect MCP smoke: PASS");
+  throw lastError || new Error("Deployed MCP smoke failed");
+}
+
+await waitForVersion();
+await runMcpSmoke();
