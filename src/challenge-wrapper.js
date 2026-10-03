@@ -1,6 +1,6 @@
 import app from "./root.js";
 
-const SERVER_VERSION = "0.4.1";
+const SERVER_VERSION = "0.4.2";
 const OPENAI_CHALLENGE_TOKEN = "VONqdSiuFsgS9E6jBPmEa290-C_0eIsRoiOQGpr1An4";
 
 export default {
