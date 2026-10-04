@@ -3,12 +3,6 @@
   "name": "global-connect-pilot",
   "main": "src/challenge-wrapper.js",
   "compatibility_date": "2026-09-27",
-  "routes": [
-    {
-      "pattern": "global-connect.specforge.ru",
-      "custom_domain": true
-    }
-  ],
   "vars": {
     "OPENAI_APPS_CHALLENGE": "VONqdSiuFsgS9E6jBPmEa290-C_0eIsRoiOQGpr1An4"
   },
