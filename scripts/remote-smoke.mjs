@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process";
 
-const baseUrl = process.env.GC_BASE_URL || "https://global-connect-pilot.biv-ai-lab.workers.dev";
-const expectedVersion = process.env.GC_EXPECTED_VERSION || "0.4.0";
-const expectedChallenge = process.env.GC_OPENAI_CHALLENGE || "VONqdSiuFsgS9E6jBPmEa290-C_0eIsRoiOQGpr1An4";
+const baseUrl = process.env.GC_BASE_URL || "https://global-connect.specforge.ru";
+const expectedVersion = process.env.GC_EXPECTED_VERSION || "0.4.2";
+const expectedChallenge = process.env.GC_OPENAI_CHALLENGE || "gt8yqWFuuBumU8UBQ1EoSHsZAo8e4cqeU5sruHohKh8";
 const attempts = Number(process.env.GC_REMOTE_ATTEMPTS || 24);
 const delayMs = Number(process.env.GC_REMOTE_DELAY_MS || 10000);
 const smokeAttempts = Number(process.env.GC_MCP_SMOKE_ATTEMPTS || 5);
