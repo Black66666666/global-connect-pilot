@@ -28,9 +28,10 @@ jobs:
       - name: Cloudflare Worker dry-run build
         run: npm run check:build
 
-      - name: Wait for Cloudflare deployment and smoke-test backend MCP
+      - name: Wait for Cloudflare deployment and smoke-test custom-domain MCP
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: node scripts/remote-smoke.mjs
         env:
-          GC_BASE_URL: https://global-connect-pilot.biv-ai-lab.workers.dev
+          GC_BASE_URL: https://global-connect.specforge.ru
           GC_EXPECTED_VERSION: 0.4.2
+          GC_OPENAI_CHALLENGE: gt8yqWFuuBumU8UBQ1EoSHsZAo8e4cqeU5sruHohKh8
