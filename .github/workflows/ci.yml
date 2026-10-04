@@ -28,6 +28,18 @@ jobs:
       - name: Cloudflare Worker dry-run build
         run: npm run check:build
 
+      - name: Capture OpenAI challenge curl evidence
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          echo '=== COMMAND 1: headers ==='
+          curl -sS -D- https://global-connect.specforge.ru/.well-known/openai-apps-challenge -o /dev/null
+          echo '=== COMMAND 2: raw body via sed -n l ==='
+          curl -sS https://global-connect.specforge.ru/.well-known/openai-apps-challenge | sed -n 'l'
+          echo '=== REDIRECT CHECK ==='
+          curl -sS -o /dev/null -w 'http_code=%{http_code}\nredirect_url=%{redirect_url}\nnum_redirects=%{num_redirects}\n' https://global-connect.specforge.ru/.well-known/openai-apps-challenge
+          echo '=== BYTE COUNT ==='
+          curl -sS https://global-connect.specforge.ru/.well-known/openai-apps-challenge | wc -c
+
       - name: Wait for Cloudflare deployment and smoke-test custom-domain MCP
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: node scripts/remote-smoke.mjs
