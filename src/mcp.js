@@ -393,7 +393,7 @@ function createServer(env, request, isAdmin) {
         readOnlyHint: false,
         destructiveHint: false,
         idempotentHint: false,
-        openWorldHint: false,
+        openWorldHint: true,
       },
     },
     async (input) => createRequest(env, origin, input, isAdmin),
