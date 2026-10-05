@@ -1,0 +1,44 @@
+name: Fix create_request openWorld annotation
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Patch create_request annotation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/mcp.js')
+          s = p.read_text(encoding='utf-8')
+          old = """        idempotentHint: false,\n        openWorldHint: false,"""
+          new = """        idempotentHint: false,\n        openWorldHint: true,"""
+          count = s.count(old)
+          if count != 1:
+              raise SystemExit(f'Expected exactly one create_request annotation block, found {count}')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Commit and push
+        run: |
+          if git diff --quiet -- src/mcp.js; then
+            echo "No change needed"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/mcp.js
+          git commit -m "fix: mark public request creation as open-world"
+          git push
