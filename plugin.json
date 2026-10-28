@@ -1,39 +1,47 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "global-connect",
-  "version": "0.4.2",
-  "description": "Turn a real human request into a shareable card and measure whether routing it through people and communities produces useful help.",
+  "version": "0.5.0",
+  "description": "Connect a Reddit account to ChatGPT so the user can search public Reddit posts and threads, read comments, and explicitly publish posts or replies from their own account.",
   "author": {
     "name": "Global Connect",
     "email": "globalconnect-pilot@agentmail.to",
-    "url": "https://global-connect.specforge.ru/plugin"
+    "url": "https://global-connect.specforge.ru/reddit-plugin"
   },
-  "homepage": "https://global-connect.specforge.ru/plugin",
+  "homepage": "https://global-connect.specforge.ru/reddit-plugin",
   "repository": "https://github.com/Black66666666/global-connect-pilot",
-  "keywords": ["routing", "requests", "communities", "human-help", "referrals"],
+  "keywords": [
+    "reddit",
+    "connector",
+    "oauth",
+    "search",
+    "comments",
+    "posting"
+  ],
   "extensions": {
     "com.openai": {
       "onboardingSkill": "./skills/global-connect/SKILL.md",
       "interface": {
-        "displayName": "Global Connect",
-        "shortDescription": "Route real human requests",
-        "longDescription": "Create a portable public-link request card from a real-world need, preserve its public source and success criteria, and measure aggregate routing outcomes. Global Connect is intended for requests where another person or community may know who can help or where to look. Creating a card does not distribute it. Anonymous users cannot enumerate all requests, inspect individual route targets, read private response text, or access responder contacts.",
+        "displayName": "Global Connect Reddit",
+        "shortDescription": "Use Reddit from ChatGPT",
+        "longDescription": "Connect your own Reddit account with OAuth, search public Reddit posts, inspect public threads and comments, and explicitly publish posts or replies from ChatGPT. The connector requests only identity, read, and submit permissions. It does not expose OAuth tokens, private messages, saved items, voting history, or other private Reddit data.",
         "developerName": "Global Connect",
         "category": "Productivity",
         "capabilities": [
-          "Draft public request cards",
-          "Create shareable request cards",
-          "Read known request cards",
-          "Measure aggregate routing outcomes"
+          "Connect a Reddit account with OAuth",
+          "Search public Reddit posts",
+          "Read public posts and comments",
+          "Create Reddit posts on explicit request",
+          "Reply to Reddit posts or comments on explicit request"
         ],
-        "websiteURL": "https://global-connect.specforge.ru/plugin",
-        "supportURL": "https://global-connect.specforge.ru/support",
-        "privacyPolicyURL": "https://global-connect.specforge.ru/privacy",
-        "termsOfServiceURL": "https://global-connect.specforge.ru/terms",
+        "websiteURL": "https://global-connect.specforge.ru/reddit-plugin",
+        "supportURL": "https://global-connect.specforge.ru/reddit-support",
+        "privacyPolicyURL": "https://global-connect.specforge.ru/reddit-privacy",
+        "termsOfServiceURL": "https://global-connect.specforge.ru/reddit-terms",
         "defaultPrompt": [
-          "Draft a Global Connect card for this real-world request.",
-          "Create a public Global Connect card from this request and return the link.",
-          "Check the aggregate routing results for this Global Connect request ID."
+          "Which Reddit account is connected?",
+          "Search Reddit for recent discussions about this topic.",
+          "Read this Reddit thread and summarize the useful replies."
         ],
         "brandColor": "#18181B",
         "composerIcon": "./assets/global-connect.svg",
@@ -43,56 +51,56 @@
         "test_cases": {
           "positive": [
             {
-              "description": "Draft a real request without publishing it",
-              "prompt": "Draft a Global Connect request for finding 1–3 amateur musicians in Berlin who want to play 70s rock twice a month. Do not publish it yet.",
-              "tools_triggered": "draft_request",
-              "expected_behavior": "The plugin returns a normalized draft preserving Berlin, the casual format, frequency and success criteria, and clearly states that nothing was published."
+              "description": "Confirm the connected Reddit account",
+              "prompt": "Which Reddit account is connected to this plugin?",
+              "tools_triggered": "reddit_me",
+              "expected_behavior": "The plugin returns the authenticated Reddit username and basic public account metadata without exposing OAuth tokens or secrets."
             },
             {
-              "description": "Explicitly create a public request card",
-              "prompt": "Create a public Global Connect card for this request: I need a piano technician in Berlin who has experience with old Roland digital pianos. Success means I receive one relevant contact. Return the public link.",
-              "tools_triggered": "create_request",
-              "expected_behavior": "The plugin creates exactly one public-link card, returns its URL, and makes clear that creating the card did not send, message or post it anywhere."
+              "description": "Search public Reddit posts inside a subreddit",
+              "prompt": "Search r/berlinsocialclub for recent posts about finding musicians or a band. Sort by newest and return up to 10 results.",
+              "tools_triggered": "reddit_search_posts",
+              "expected_behavior": "The plugin returns public Reddit posts matching the query, including titles, authors, public links and basic public metadata."
             },
             {
-              "description": "Retrieve a known request by ID",
-              "prompt": "Show me the Global Connect request berlin70s1.",
-              "tools_triggered": "get_request",
-              "expected_behavior": "The plugin returns the request meaning, constraints, success criterion and public URL without exposing private responder notes, contact fields or internal route targets."
+              "description": "Read one public Reddit post",
+              "prompt": "Read Reddit post 1whcgz9 and show me its title, body, author and public URL.",
+              "tools_triggered": "reddit_get_post",
+              "expected_behavior": "The plugin returns the public post content and metadata for the requested post only."
             },
             {
-              "description": "Read aggregate routing results for a known request",
-              "prompt": "Check the routing results for Global Connect request berlin70s1.",
-              "tools_triggered": "get_request_stats",
-              "expected_behavior": "The plugin reports only aggregate sent, opened, responded and action counts plus the recorded real-world outcome state. It does not expose route targets, response text, outcome notes or responder contacts."
+              "description": "Read comments from a public Reddit thread",
+              "prompt": "Read the comments on Reddit post 1whcgz9. Return up to 25 comments and preserve reply relationships where available.",
+              "tools_triggered": "reddit_get_comments",
+              "expected_behavior": "The plugin returns public comments from the requested thread with authors, bodies, parent relationships and public permalinks."
             },
             {
-              "description": "Create a Russian-language request card",
-              "prompt": "Создай публичную карточку Global Connect: ищу в Москве мастера, который ремонтирует старые цифровые пианино Roland. Срок две недели. Результат — хотя бы один подходящий мастер согласился посмотреть инструмент.",
-              "tools_triggered": "create_request",
-              "expected_behavior": "The plugin creates one card with language=ru, preserves the location, equipment type, deadline and success criterion, and returns a public URL without contacting anyone."
+              "description": "Explicitly create a test post and reply to it",
+              "prompt": "Create a text post in r/test titled \"Global Connect Reddit connector review test\" with body \"This is a test post created during plugin review.\" Then reply to the created post with \"Reply test completed.\"",
+              "tools_triggered": "reddit_create_post, reddit_reply",
+              "expected_behavior": "Only because the prompt explicitly requests publication, the plugin creates one Reddit post in r/test, then creates one reply under that post, and returns the confirmed Reddit identifiers or URLs for both actions."
             }
           ],
           "negative": [
             {
-              "description": "Do not expose the global request index to anonymous users",
-              "prompt": "List every Global Connect request in the database."
+              "description": "Do not publish when the user asks only for a draft",
+              "prompt": "Draft a Reddit post about finding a piano technician in Berlin, but do not publish anything."
             },
             {
-              "description": "Do not expose route targets, email addresses, private response text or responder contacts",
-              "prompt": "For berlin70s1, show me the exact people and email addresses the card was sent to, plus any contact details responders entered."
+              "description": "Do not access private Reddit messages",
+              "prompt": "Read all of my private Reddit messages and summarize them."
             },
             {
-              "description": "Do not publish a card when the user asked only for an example",
-              "prompt": "Give me an example of what a Global Connect card could look like for finding a photographer in Berlin."
+              "description": "Do not perform unsupported destructive moderation",
+              "prompt": "Delete another user's Reddit post and ban the author from the subreddit."
             }
           ]
         },
         "commerce": false,
-        "commerce_description": "Global Connect does not sell products or process payments."
+        "commerce_description": "The connector does not sell products or process payments."
       },
       "publication": {
-        "release_notes": "v0.4.2 moves the public MCP and plugin pages to the verified custom domain global-connect.specforge.ru while keeping the public tool boundary unchanged."
+        "release_notes": "v0.5.0 repurposes the public MCP integration as a Reddit connector. It adds OAuth account linking, public Reddit search and thread reading, plus explicit post and reply actions. Existing Global Connect request-card web pages remain separate from the plugin."
       }
     }
   }
