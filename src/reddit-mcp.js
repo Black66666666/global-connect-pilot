@@ -179,15 +179,10 @@ async function ensureRedditSchema(env) {
   ]);
 }
 
-function originFromRequest(request) {
-  const url = new URL(request.url);
-  const forwardedHost = request.headers.get("x-forwarded-host");
-  const forwardedProto = request.headers.get("x-forwarded-proto");
-  if (forwardedHost) {
-    const proto = forwardedProto ? `${forwardedProto.replace(/:$/, "")}:` : url.protocol;
-    return `${proto}//${forwardedHost}`;
-  }
-  return `${url.protocol}//${url.host}`;
+const PUBLIC_ORIGIN = "https://global-connect.specforge.ru";
+
+function originFromRequest(_request) {
+  return PUBLIC_ORIGIN;
 }
 
 function isAllowedChatGptRedirect(uri) {
