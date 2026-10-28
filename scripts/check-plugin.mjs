@@ -58,5 +58,15 @@ if (names.length !== 1 || names[0] !== "global-connect") fail("mcp.json must def
 const server = servers["global-connect"];
 if (server.type !== "streamable-http") fail("MCP server type must be streamable-http");
 if (server.url !== "https://global-connect.specforge.ru/mcp") fail("unexpected production MCP URL");
+const auth = server.extensions?.["com.openai"]?.auth;
+if (!auth || auth.type !== "oauth") fail("MCP server must declare OAuth authentication");
+if (auth.client?.mode !== "provided") fail("OAuth client mode must be provided");
+if (auth.client?.clientId !== "global-connect-chatgpt") fail("unexpected OAuth client ID");
+if (auth.client?.tokenEndpointAuthMethod !== "none") fail("OAuth client must use public-client token exchange");
+if (auth.authorizationUrl !== "https://global-connect.specforge.ru/oauth/authorize") fail("unexpected OAuth authorization URL");
+if (auth.tokenUrl !== "https://global-connect.specforge.ru/oauth/token") fail("unexpected OAuth token URL");
+for (const scope of ["reddit.identity", "reddit.read", "reddit.write"]) {
+  if (!auth.baseScopes?.includes(scope)) fail(`missing OAuth base scope ${scope}`);
+}
 
 console.log(`Plugin package check: PASS — ${plugin.name} v${plugin.version}, ${positive.length} positive + ${negative.length} negative cases, directory icon present`);
