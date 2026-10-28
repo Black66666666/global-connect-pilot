@@ -216,7 +216,13 @@ async function handleAuthorize(request, env) {
   const clientState = url.searchParams.get("state") || "";
   const codeChallenge = url.searchParams.get("code_challenge");
   const codeChallengeMethod = url.searchParams.get("code_challenge_method");
-  const scope = url.searchParams.get("scope") || INTERNAL_SCOPES.join(" ");
+  const requestedScope = url.searchParams.get("scope") || INTERNAL_SCOPES.join(" ");
+  const requestedScopes = [...new Set(requestedScope.split(/\s+/).filter(Boolean))];
+  const unsupportedScopes = requestedScopes.filter((scope) => !INTERNAL_SCOPES.includes(scope));
+  if (unsupportedScopes.length) {
+    return json({ error: "invalid_scope", error_description: `Unsupported scopes: ${unsupportedScopes.join(", ")}` }, 400);
+  }
+  const scope = requestedScopes.join(" ");
   const resource = url.searchParams.get("resource") || originFromRequest(request);
 
   if (responseType !== "code") return json({ error: "unsupported_response_type" }, 400);
@@ -418,10 +424,12 @@ async function handleToken(request, env) {
     const code = String(form.get("code") || "");
     const redirectUri = String(form.get("redirect_uri") || "");
     const codeVerifier = String(form.get("code_verifier") || "");
+    const tokenResource = String(form.get("resource") || "");
     const record = await env.DB.prepare("SELECT * FROM connector_auth_codes WHERE code_hash=? LIMIT 1").bind(await sha256(code)).first();
 
     if (!record || record.expires_at < nowSeconds()) return json({ error: "invalid_grant" }, 400);
     if (record.redirect_uri !== redirectUri || record.client_id !== clientId) return json({ error: "invalid_grant" }, 400);
+    if (tokenResource && tokenResource !== record.resource) return json({ error: "invalid_target", error_description: "OAuth resource mismatch" }, 400);
     if (!(await verifyPkce(codeVerifier, record.code_challenge))) return json({ error: "invalid_grant", error_description: "PKCE verification failed" }, 400);
 
     await env.DB.prepare("DELETE FROM connector_auth_codes WHERE code_hash=?").bind(await sha256(code)).run();
@@ -479,6 +487,7 @@ async function authenticateConnectorRequest(request, env) {
     FROM connector_tokens t JOIN reddit_accounts a ON a.account_id=t.account_id
     WHERE t.access_hash=? LIMIT 1`).bind(tokenHash).first();
   if (!record || record.access_expires_at < nowSeconds()) return null;
+  if (record.resource && record.resource !== PUBLIC_ORIGIN && record.resource !== `${PUBLIC_ORIGIN}/mcp`) return null;
   return record;
 }
 
@@ -603,6 +612,15 @@ function redditWriteError(data) {
   return null;
 }
 
+function hasScope(auth, scope) {
+  return String(auth?.scope || "").split(/\s+/).includes(scope);
+}
+
+function requireScope(auth, scope) {
+  if (hasScope(auth, scope)) return null;
+  return errorResult("insufficient_scope", `This action requires the ${scope} scope.`, { required_scope: scope });
+}
+
 function createRedditServer(env, request, auth) {
   const origin = originFromRequest(request);
   const server = new McpServer(
@@ -637,6 +655,8 @@ function createRedditServer(env, request, auth) {
       _meta: { "openai/profile": true },
     },
     async () => {
+      const scopeError = requireScope(auth, "reddit.identity");
+      if (scopeError) return scopeError;
       try {
         const response = await redditFetch(env, auth.account_id, "/api/v1/me");
         const data = await parseRedditJson(response);
@@ -671,6 +691,8 @@ function createRedditServer(env, request, auth) {
       securitySchemes: [{ type: "oauth2", scopes: ["reddit.read"] }],
     },
     async ({ query, subreddit, sort, time, limit }) => {
+      const scopeError = requireScope(auth, "reddit.read");
+      if (scopeError) return scopeError;
       try {
         if (subreddit && !validSubreddit(subreddit)) {
           return errorResult("invalid_subreddit", "Subreddit names may contain only letters, numbers, and underscores.");
@@ -705,6 +727,8 @@ function createRedditServer(env, request, auth) {
       securitySchemes: [{ type: "oauth2", scopes: ["reddit.read"] }],
     },
     async ({ post_id }) => {
+      const scopeError = requireScope(auth, "reddit.read");
+      if (scopeError) return scopeError;
       try {
         const id = normalizePostId(post_id);
         const data = await parseRedditJson(await redditFetch(env, auth.account_id, `/by_id/t3_${encodeURIComponent(id)}.json?raw_json=1`));
@@ -732,6 +756,8 @@ function createRedditServer(env, request, auth) {
       securitySchemes: [{ type: "oauth2", scopes: ["reddit.read"] }],
     },
     async ({ post_id, sort, limit, depth }) => {
+      const scopeError = requireScope(auth, "reddit.read");
+      if (scopeError) return scopeError;
       try {
         const id = normalizePostId(post_id);
         const params = new URLSearchParams({ sort, limit: String(limit), depth: String(depth), raw_json: "1" });
@@ -767,6 +793,8 @@ function createRedditServer(env, request, auth) {
       securitySchemes: [{ type: "oauth2", scopes: ["reddit.write"] }],
     },
     async ({ subreddit, title, kind, text, url, nsfw, spoiler }) => {
+      const scopeError = requireScope(auth, "reddit.write");
+      if (scopeError) return scopeError;
       try {
         if (!validSubreddit(subreddit)) return errorResult("invalid_subreddit", "Invalid subreddit name.");
         if (kind === "link" && !url) return errorResult("missing_url", "A URL is required for a link post.");
@@ -820,6 +848,8 @@ function createRedditServer(env, request, auth) {
       securitySchemes: [{ type: "oauth2", scopes: ["reddit.write"] }],
     },
     async ({ parent_fullname, text }) => {
+      const scopeError = requireScope(auth, "reddit.write");
+      if (scopeError) return scopeError;
       try {
         const form = new URLSearchParams({
           api_type: "json",
