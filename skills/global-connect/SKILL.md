@@ -1,40 +1,38 @@
 ---
-name: global-connect-routing
-description: Create, inspect, distribute, and evaluate a real Global Connect request through measurable human or community routes.
+name: global-connect-reddit
+description: Use the connected Reddit account to search and read public Reddit discussions, and to publish posts or replies only after explicit user approval.
 ---
 
-# Global Connect routing
+# Global Connect Reddit connector
 
-Use this skill when the user wants to create, inspect, distribute, or evaluate a Global Connect request.
+Use this skill when the user wants ChatGPT to work with Reddit through their connected Reddit account.
 
-## Core principle
+## Core rules
 
-Global Connect routes a real request to people, communities, services, or agents that may help. The request card is the primary object. Do not invent a problem merely to exercise the system when a real source request is available.
+1. Confirm the connected account with `reddit_me` when account identity matters.
+2. Use `reddit_search_posts` to find public Reddit posts. Search can be global or limited to one subreddit.
+3. Use `reddit_get_post` to inspect one public post.
+4. Use `reddit_get_comments` to inspect a thread before recommending or drafting a reply.
+5. Never claim that Reddit was searched, posted to, or replied to unless the corresponding tool call succeeded.
+6. Never publish merely because the user asked for a draft, suggestion, rewrite, analysis, or example.
+7. Call `reddit_create_post` only when the user explicitly asks to publish the exact post.
+8. Call `reddit_reply` only when the user explicitly asks to send the exact reply.
+9. Respect subreddit rules, posting requirements, rate limits, and moderator decisions.
+10. Do not expose OAuth access tokens, refresh tokens, client secrets, or connector session tokens.
+11. The connector does not provide private messages, saved items, voting history, private profile data, moderation powers, or account-management actions.
+12. If Reddit rejects a write because of subreddit requirements, report the rejection and ask for the minimum information needed to retry. Do not bypass subreddit restrictions.
 
-## Workflow
+## Typical workflow
 
-1. If the user supplied a real request, preserve its meaning, constraints, location, timing, and definition of success.
-2. If the request is incomplete, use `draft_request` first. Ask only for information that materially changes routing.
-3. Before creating a duplicate, use `list_requests` only when that authorized operator tool is available. Anonymous users cannot enumerate all requests.
-4. Create a card only when the user explicitly wants a new request or asks to publish it.
-5. Return the public request URL after creation and state that creating a card does not distribute it.
-6. Before an external distribution attempt, register a unique route with `register_route` when that authorized operator tool is available. Use a non-sensitive target label and never store private email addresses as route labels.
-7. Use the returned tracked URL for that route. Every external route must have its own `source_ref`.
-8. Before judging whether routing worked, call `get_request_stats` and, when authorized, `list_routes`. Distinguish routes sent, opens, responses, directions, named-person referrals and direct helpers.
-9. When an authorized operator needs to act on a response, use `get_responses`. Contact fields are private and should be requested only when actually needed.
-10. Prefer a few highly relevant routes over broad indiscriminate distribution.
-11. Never expose private responder contact fields to an anonymous/public user. Use public profiles or consented contact details only.
-12. Do not claim a request is solved merely because somebody clicked “I can help”. Confirm the real-world success criterion first.
-13. When the real-world result becomes known and `record_outcome` is available, record `succeeded`, `failed`, `expired`, or keep `pending`, with a concise operator note. Public users may see only the outcome state, never the private note.
+For research:
+`reddit_search_posts` → `reddit_get_post` → `reddit_get_comments` → summarize relevant public evidence.
 
-## Distribution policy
+For outreach:
+search/read first → draft the proposed reply in chat → obtain explicit user instruction to send → `reddit_reply`.
 
-Prioritize places where relevant attention already exists: a recent related discussion, a live local/community board, a specific person with adjacent experience, or an active specialist group. Cold generic company inboxes are a fallback, not the default.
+For a new post:
+draft in chat → obtain explicit user instruction to publish → `reddit_create_post`.
 
-Register the route before sending or posting when possible. `register_route` only records the route and produces a tracked URL; it does not itself contact the external person or community.
+## Privacy
 
-## Safety and privacy
-
-Do not create or distribute requests that expose unnecessary personal data. For third-party source requests, preserve a public source URL and state clearly when the requester has agreed to broader sharing. Do not imply that a source author is a Global Connect user unless they actually are.
-
-The public plugin deliberately cannot enumerate all requests, inspect individual route targets, read response notes, read contact fields, or read private outcome notes. Those are operator-only capabilities.
+Use only the Reddit account authorized by the current connector session. Do not reveal authentication material. Return only the public Reddit content and public account metadata needed for the user's task.
