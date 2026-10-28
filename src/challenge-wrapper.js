@@ -1,6 +1,6 @@
 import app from "./root.js";
 
-const SERVER_VERSION = "0.4.2";
+const SERVER_VERSION = "0.5.0";
 const OPENAI_CHALLENGE_TOKEN = "gt8yqWFuuBumU8UBQlEoSHsZAo8e4cqeU5sruHohKh8";
 
 export default {
@@ -31,7 +31,7 @@ export default {
 
     // Distinct deployment marker so CI cannot accept an older Worker revision.
     if (url.pathname === "/mcp-health") {
-      return Response.json({ ok: true, service: "global-connect-mcp", version: SERVER_VERSION }, {
+      return Response.json({ ok: true, service: "global-connect-reddit-mcp", version: SERVER_VERSION }, {
         headers: { "cache-control": "no-store" },
       });
     }
