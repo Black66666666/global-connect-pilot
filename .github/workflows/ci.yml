@@ -45,5 +45,5 @@ jobs:
         run: node scripts/remote-smoke.mjs
         env:
           GC_BASE_URL: https://global-connect.specforge.ru
-          GC_EXPECTED_VERSION: 0.4.2
+          GC_EXPECTED_VERSION: 0.5.0
           GC_OPENAI_CHALLENGE: gt8yqWFuuBumU8UBQ1EoSHsZAo8e4cqeU5sruHohKh8
