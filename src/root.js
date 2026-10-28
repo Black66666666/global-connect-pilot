@@ -1,7 +1,8 @@
 import webApp from "./worker.js";
-import { handleMcp, ensurePilotRoutingData } from "./mcp.js";
+import { ensurePilotRoutingData } from "./mcp.js";
+import { handleMcp, handleRedditConnectorHttp, REDDIT_CONNECTOR_VERSION } from "./reddit-mcp.js";
 
-const VERSION = "0.4.0";
+const VERSION = REDDIT_CONNECTOR_VERSION;
 
 function esc(value = "") {
   return String(value)
@@ -162,6 +163,8 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/mcp") return handleMcp(request, env);
+    const redditConnectorResponse = await handleRedditConnectorHttp(request, env);
+    if (redditConnectorResponse) return redditConnectorResponse;
     if (url.pathname === "/plugin") return infoPage("plugin");
     if (url.pathname === "/privacy") return infoPage("privacy");
     if (url.pathname === "/terms") return infoPage("terms");
