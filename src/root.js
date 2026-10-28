@@ -65,6 +65,54 @@ function infoPage(kind) {
     <p>Include the request-card ID when your question concerns a specific card. Do not send passwords or authentication tokens.</p></div>`);
 }
 
+
+function redditInfoPage(kind) {
+  const updated = "2026-10-28";
+
+  if (kind === "plugin") return page("en", "Global Connect Reddit", `
+    <div class="card"><h1>Global Connect Reddit</h1>
+    <p>Global Connect Reddit connects a user's own Reddit account to ChatGPT through OAuth.</p>
+    <p>The connector can search and read public Reddit posts and comments, and can create posts or replies only when the user explicitly requests that external action.</p>
+    <p>It does not expose OAuth tokens, private messages, saved items, voting history, or private Reddit profile data.</p>
+    <p><a href="/reddit-privacy">Privacy</a> · <a href="/reddit-terms">Terms</a> · <a href="/reddit-support">Support</a></p></div>`);
+
+  if (kind === "privacy") return page("en", "Global Connect Reddit Privacy Policy", `
+    <div class="card"><h1>Privacy Policy</h1><p class="muted">Last updated ${updated}</p>
+    <p>This connector links a Reddit account to ChatGPT so the user can work with Reddit from a conversation.</p>
+    <h2>Data processed</h2><ul>
+      <li>Reddit OAuth authorization data needed to keep the connection working.</li>
+      <li>The connected Reddit username and public account metadata.</li>
+      <li>Public Reddit posts and comments requested by the user.</li>
+      <li>Post or reply content the user explicitly asks to publish.</li>
+      <li>Operational logs produced by the hosting platform.</li>
+    </ul>
+    <h2>Authentication data</h2>
+    <p>Reddit refresh and access tokens are stored server-side for the connection and are not returned to ChatGPT tool results. Passwords are never requested or stored.</p>
+    <h2>Use</h2>
+    <p>Data is used only to operate the connector, maintain the authorized Reddit session, execute the user's requested Reddit actions, prevent abuse, and troubleshoot failures.</p>
+    <h2>Third parties</h2>
+    <p>Reddit processes Reddit API requests under its own terms and policies. Cloudflare hosts the connector infrastructure.</p>
+    <h2>Deletion and support</h2>
+    <p>For connection removal, privacy questions, or deletion requests, use the support page.</p></div>`);
+
+  if (kind === "terms") return page("en", "Global Connect Reddit Terms", `
+    <div class="card"><h1>Terms of Service</h1><p class="muted">Last updated ${updated}</p>
+    <ul>
+      <li>You must connect and use only a Reddit account you are authorized to control.</li>
+      <li>You remain responsible for content posted or replied through your Reddit account.</li>
+      <li>Subreddit rules, Reddit's terms, rate limits, and moderation decisions continue to apply.</li>
+      <li>The connector must not be used for spam, harassment, deception, unlawful activity, or attempts to bypass Reddit restrictions.</li>
+      <li>Write actions are intended to occur only after an explicit user request to publish or reply.</li>
+    </ul>
+    <p>The connector is provided without a guarantee that Reddit will accept any specific API request.</p></div>`);
+
+  return page("en", "Global Connect Reddit Support", `
+    <div class="card"><h1>Support</h1>
+    <p>For connector support, privacy requests, abuse reports, or account-linking issues, contact:</p>
+    <p><b>globalconnect-pilot@agentmail.to</b></p>
+    <p>Do not send Reddit passwords, OAuth tokens, client secrets, or ChatGPT session data.</p></div>`);
+}
+
 function labels(isRu) {
   return isRu ? {
     deadline: "Срок", budget: "Бюджет", constraints: "Ограничения", success: "Критерий результата",
@@ -169,6 +217,10 @@ export default {
     if (url.pathname === "/privacy") return infoPage("privacy");
     if (url.pathname === "/terms") return infoPage("terms");
     if (url.pathname === "/support") return infoPage("support");
+    if (url.pathname === "/reddit-plugin") return redditInfoPage("plugin");
+    if (url.pathname === "/reddit-privacy") return redditInfoPage("privacy");
+    if (url.pathname === "/reddit-terms") return redditInfoPage("terms");
+    if (url.pathname === "/reddit-support") return redditInfoPage("support");
     if (url.pathname === "/mcp-health") return Response.json({ ok: true, service: "global-connect-mcp", version: VERSION });
     if (url.pathname === "/.well-known/openai-apps-challenge") {
       if (!env.OPENAI_APPS_CHALLENGE) return new Response("Not configured", { status: 404 });
